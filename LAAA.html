@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Ancestry Analysis Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        :root {
+            --primary: #3498db;
+            --secondary: #2ecc71;
+            --dark: #2c3e50;
+            --light: #ecf0f1;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background-color: var(--light);
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        h1, h2, h3 {
+            margin-bottom: 1rem;
+        }
+        
+        .workflow-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        .step {
+            background: white;
+            border-radius: 5px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .step.active {
+            border-left: 5px solid var(--primary);
+        }
+        
+        .step.completed {
+            border-left: 5px solid var(--secondary);
+        }
+        
+        .step.disabled {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        
+        .step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .step-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .step-number {
+            background-color: var(--primary);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .completed .step-number {
+            background-color: var(--secondary);
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        
+        .file-input-container {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+        
+        .file-input-label {
+            display: block;
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .file-input-label:hover {
+            background-color: #2980b9;
+        }
+        
+        .file-input {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .file-name {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .btn {
+            display: inline-block;
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary);
+        }
+        
+        .btn-secondary:hover {
+            background-color: #27ae60;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 1rem;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            margin-top: 1rem;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        
+        .status-indicator.success {
+            background-color: rgba(46, 204, 113, 0.2);
+            color: #27ae60;
+        }
+        
+        .status-indicator.error {
+            background-color: rgba(231, 76, 60, 0.2);
+            color: #c0392b;
+        }
+        
+        .status-indicator.warning {
+            background-color: rgba(243, 156, 18, 0.2);
+            color: #d35400;
+        }
+        
+        .status-indicator.info {
+            background-color: rgba(52, 152, 219, 0.2);
+            color: #2980b9;
+        }
+        
+        .status-icon {
+            margin-right: 10px;
+        }
+        
+        .progress-container {
+            width: 100%;
+            height: 20px;
+            background-color: #ddd;
+            border-radius: 10px;
+            margin-top: 1rem;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background-color: var(--primary);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8rem;
+        }
+        
+        .visualization {
+            margin-top: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 1rem;
+            background-color: white;
+        }
+        
+        .results-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .result-card {
+            background-color: white;
+            border-radius: 5px;
+            padding: 1rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .notification.success {
+            background-color: var(--secondary);
+        }
+        
+        .notification.error {
+            background-color: var(--danger);
+        }
+        
+        .notification.warning {
+            background-color: var(--warning);
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            margin: 20px auto;
+            border: 5px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .results-section {
+            margin-top: 2rem;
+        }
+        
+        .plot-placeholder {
+            width: 100%;
+            height: 300px;
+            background-color: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            color: #777;
+        }
+        
+        .log-console {
+            font-family: monospace;
+            background-color: #1e1e1e;
+            color: #ddd;
+            padding: 1rem;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+        
+        .log-error {
+            color: #ff6b6b;
+        }
+        
+        .log-success {
+            color: #51cf66;
+        }
+        
+        .log-warning {
+            color: #fcc419;
+        }
+        
+        .tab-container {
+            margin-top: 1rem;
+        }
+        
+        .tab-header {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        
+        .tab.active {
+            background-color: white;
+            border-color: #ddd;
+            border-bottom: 1px solid white;
+            margin-bottom: -1px;
+        }
+        
+        .tab-content {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-top: none;
+            background-color: white;
+            border-radius: 0 0 5px 5px;
+        }
+        
+        .tab-pane {
+            display: none;
+        }
+        
+        .tab-pane.active {
+            display: block;
+        }
+        
+        .output-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 1rem;
+        }
+        
+        .output-link {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            text-decoration: none;
+            color: var(--dark);
+            transition: all 0.2s ease;
+        }
+        
+        .output-link:hover {
+            background-color: #f8f9fa;
+            border-color: #aaa;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .step {
+                padding: 1rem;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+            }
+            
+            .results-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Local Ancestry Analysis Tool</h1>
+            <p>Analyze local ancestry in admixed populations</p>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="workflow-container">
+            <!-- Step 1: Input Parameters -->
+            <div class="step active" id="step1">
+                <div class="step-header">
+                    <div class="step-title">
+                        <div class="step-number">1</div>
+                        <h2>Input Parameters</h2>
+                    </div>
+                </div>
+                
+                <div class="step-content">
+                    <div class="form-group">
+                        <label for="ancestor1">Ancestor 1:</label>
+                        <input type="text" id="ancestor1" name="ancestor1" placeholder="e.g., Ggj" value="Ggj">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="ancestor2">Ancestor 2:</label>
+                        <input type="text" id="ancestor2" name="ancestor2" placeholder="e.g., Ggd" value="Ggd">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="target">Target Population:</label>
+                        <input type="text" id="target" name="target" placeholder="e.g., Ggg" value="Ggg">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="filePrefix">File Prefix:</label>
+                        <input type="text" id="filePrefix" name="filePrefix" placeholder="e.g., Ggg=GgjxGgd" value="Ggg=GgjxGgd">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="chrSet">Chromosome Set:</label>
+                        <input type="number" id="chrSet" name="chrSet" min="1" max="100" value="26">
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn" id="nextToStep2">Continue to File Upload</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Step 2: File Upload -->
+            <div class="step" id="step2">
+                <div class="step-header">
+                    <div class="step-title">
+                        <div class="step-number">2</div>
+                        <h2>File Upload</h2>
+                    </div>
+                </div>
+                
+                <div class="step-content">
+                    <p class="form-group">Upload the required files for analysis. Please make sure to provide all the PLINK formatted files (.bed, .bim, .fam).</p>
+                    
+                    <div class="file-input-container">
+                        <label class="file-input-label" for="bedFile">Upload .bed File</label>
+                        <input type="file" id="bedFile" class="file-input" accept=".bed">
+                        <div class="file-name" id="bedFileName">No file selected</div>
+                    </div>
+                    
+                    <div class="file-input-container">
+                        <label class="file-input-label" for="bimFile">Upload .bim File</label>
+                        <input type="file" id="bimFile" class="file-input" accept=".bim">
+                        <div class="file-name" id="bimFileName">No file selected</div>
+                    </div>
+                    
+                    <div class="file-input-container">
+                        <label class="file-input-label" for="famFile">Upload .fam File</label>
+                        <input type="file" id="famFile" class="file-input" accept=".fam">
+                        <div class="file-name" id="famFileName">No file selected</div>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn" id="backToStep1">Previous</button>
+                        <button class="btn" id="nextToStep3">Continue to Analysis Configuration</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Step 3: Analysis Configuration -->
+            <div class="step" id="step3">
+                <div class="step-header">
+                    <div class="step-title">
+                        <div class="step-number">3</div>
+                        <h2>Analysis Configuration</h2>
+                    </div>
+                </div>
+                
+                <div class="step-content">
+                    <h3>Filtering Parameters</h3>
+                    
+                    <div class="form-group">
+                        <label for="maf">Minor Allele Frequency (MAF) Threshold:</label>
+                        <input type="number" id="maf" name="maf" min="0" max="0.5" step="0.01" value="0.05">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="hwe">Hardy-Weinberg Equilibrium P-value Threshold:</label>
+                        <input type="number" id="hwe" name="hwe" min="0" max="1" step="0.000001" value="0.000001">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="geno">SNP Missingness Threshold:</label>
+                        <input type="number" id="geno" name="geno" min="0" max="1" step="0.01" value="0.1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mind">Individual Missingness Threshold:</label>
+                        <input type="number" id="mind" name="mind" min="0" max="1" step="0.01" value="0.1">
+                    </div>
+                    
+                    <h3>ADMIXTURE Parameters</h3>
+                    
+                    <div class="form-group">
+                        <label for="ancThreshold">Ancestral Threshold:</label>
+                        <input type="number" id="ancThreshold" name="ancThreshold" min="0" max="1" step="0.01" value="0.75">
+                        <small>For ancestral groups, individuals require proportion ≥ this value</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="targetThreshold">Target Threshold:</label>
+                        <input type="number" id="targetThreshold" name="targetThreshold" min="0" max="1" step="0.01" value="0.90">
+                        <small>For target individuals, remove if proportion > this value</small>
+                    </div>
+                    
+                    <h3>LAMP Parameters</h3>
+                    
+                    <div class="form-group">
+                        <label for="generations">Generations:</label>
+                        <input type="number" id="generations" name="generations" min="1" max="100" value="2">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="recombRate">Recombination Rate:</label>
+                        <input type="number" id="recombRate" name="recombRate" min="0" max="1" step="0.00000001" value="0.00000001">
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn" id="backToStep2">Previous</button>
+                        <button class="btn btn-secondary" id="startAnalysis">Start Analysis</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Step 4: Processing and Results -->
+            <div class="step" id="step4">
+                <div class="step-header">
+                    <div class="step-title">
+                        <div class="step-number">4</div>
+                        <h2>Analysis Progress</h2>
+                    </div>
+                </div>
+                
+                <div class="step-content">
+                    <div class="progress-container">
+                        <div class="progress-bar" id="analysisProgress" style="width: 0%">0%</div>
+                    </div>
+                    
+                    <div class="status-indicator info" id="analysisStatus">
+                        <span class="status-icon">ℹ️</span>
+                        <span id="statusMessage">Preparing for analysis...</span>
+                    </div>
+                    
+                    <div class="log-console" id="logConsole">
+                        <div class="log-entry">Ready to start analysis...</div>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn" id="stopAnalysis" style="display: none;">Stop Analysis</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Step 5: Results and Visualization -->
+            <div class="step" id="step5">
+                <div class="step-header">
+                    <div class="step-title">
+                        <div class="step-number">5</div>
+                        <h2>Results and Visualization</h2>
+                    </div>
+                </div>
+                
+                <div class="step-content">
+                    <div class="tab-container">
+                        <div class="tab-header">
+                            <div class="tab active" data-tab="admixture">ADMIXTURE Results</div>
+                            <div class="tab" data-tab="pca">PCA Results</div>
+                            <div class="tab" data-tab="lamp">LAMP Analysis</div>
+                            <div class="tab" data-tab="significant">Significant Regions</div>
+                            <div class="tab" data-tab="summary">Summary</div>
+                        </div>
+                        
+                        <div class="tab-content">
+                            <div class="tab-pane active" id="admixture-tab">
+                                <h3>ADMIXTURE Visualization</h3>
+                                <div class="visualization">
+                                    <div class="plot-placeholder" id="admixtureK3Plot">
+                                        <p>ADMIXTURE K=3 plot will appear here</p>
+                                    </div>
+                                    <div class="plot-placeholder" id="admixtureK2Plot">
+                                        <p>ADMIXTURE K=2 plot will appear here</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="tab-pane" id="pca-tab">
+                                <h3>Principal Component Analysis</h3>
+                                <div class="visualization">
+                                    <div class="plot-placeholder" id="pcaPlot">
+                                        <p>PCA plot will appear here</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="tab-pane" id="lamp-tab">
+                                <h3>Local Ancestry Mapping</h3>
+                                <div class="visualization">
+                                    <div class="plot-placeholder" id="lampVisualization">
+                                        <p>LAMP visualization will appear here</p>
+                                    </div>
+                                </div>
+                                
+                                <h3>Genetic Delta by Chromosome</h3>
+                                <div class="visualization">
+                                    <div class="plot-placeholder" id="deltaPlot">
+                                        <p>Delta plot will appear here</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="tab-pane" id="significant-tab">
+                                <h3>Significant Regions</h3>
+                                <div class="visualization">
+                                    <div class="plot-placeholder" id="significantRegionsPlot">
+                                        <p>Significant regions visualization will appear here</p>
+                                    </div>
+                                </div>
+                                
+                                <h3>Top Clusters</h3>
+                                <div class="visualization">
+                                    <div class="plot-placeholder" id="topClustersPlot">
+                                        <p>Top clusters plot will appear here</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="tab-pane" id="summary-tab">
+                                <h3>Analysis Summary</h3>
+                                <div class="visualization">
+                                    <div id="summaryContent">
+                                        <p>Analysis summary will appear here after processing is complete.</p>
+                                    </div>
+                                </div>
+                                
+                                <h3>Download Results</h3>
+                                <div class="output-links" id="downloadLinks">
+                                    <!-- Download links will be added dynamically -->
+                                    <a href="#" class="output-link" id="downloadReport">
+                                        <span>📄</span> Final Report (HTML)
+                                    </a>
+                                    <a href="#" class="output-link" id="downloadSummary">
+                                        <span>📊</span> Summary Data (CSV)
+                                    </a>
+                                    <a href="#" class="output-link" id="downloadSignificant">
+                                        <span>🧬</span> Significant Regions (CSV)
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn" id="newAnalysis">New Analysis</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="notification" id="notification">
+        <span id="notificationMessage"></span>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elements
+            const steps = document.querySelectorAll('.step');
+            const progressBar = document.getElementById('analysisProgress');
+            const statusMessage = document.getElementById('statusMessage');
+            const analysisStatus = document.getElementById('analysisStatus');
+            const logConsole = document.getElementById('logConsole');
+            const notification = document.getElementById('notification');
+            
+            // Event listener setup
+            function setupEventListeners() {
+                // Step navigation buttons
+                nextToStep2.addEventListener('click', function() {
+                    collectParameters();
+                    if (validateParameters()) {
+                        goToStep(2);
+                    }
+                });
+                
+                backToStep1.addEventListener('click', function() {
+                    goToStep(1);
+                });
+                
+                nextToStep3.addEventListener('click', function() {
+                    if (validateFileUploads()) {
+                        goToStep(3);
+                    }
+                });
+                
+                backToStep2.addEventListener('click', function() {
+                    goToStep(2);
+                });
+                
+                startAnalysis.addEventListener('click', function() {
+                    collectParameters();
+                    runAnalysis();
+                });
+                
+                stopAnalysis.addEventListener('click', function() {
+                    if (analysisRunning) {
+                        clearInterval(progressInterval);
+                        analysisRunning = false;
+                        stopAnalysis.style.display = 'none';
+                        addLog('Analysis stopped by user.', 'warning');
+                        showNotification('Analysis stopped', 'warning');
+                    }
+                });
+                
+                newAnalysis.addEventListener('click', function() {
+                    // Reset everything and go back to step 1
+                    goToStep(1);
+                    
+                    // Reset file uploads
+                    bedFileName.textContent = 'No file selected';
+                    bimFileName.textContent = 'No file selected';
+                    famFileName.textContent = 'No file selected';
+                    uploadedFiles = {
+                        bed: null,
+                        bim: null,
+                        fam: null
+                    };
+                    
+                    // Clear log console
+                    logConsole.innerHTML = '';
+                    
+                    showNotification('Ready for new analysis', 'success');
+                });
+                
+                // File upload handling
+                bedFile.addEventListener('change', function(e) {
+                    if (e.target.files.length > 0) {
+                        const file = e.target.files[0];
+                        bedFileName.textContent = file.name;
+                        uploadedFiles.bed = file;
+                    }
+                });
+                
+                bimFile.addEventListener('change', function(e) {
+                    if (e.target.files.length > 0) {
+                        const file = e.target.files[0];
+                        bimFileName.textContent = file.name;
+                        uploadedFiles.bim = file;
+                    }
+                });
+                
+                famFile.addEventListener('change', function(e) {
+                    if (e.target.files.length > 0) {
+                        const file = e.target.files[0];
+                        famFileName.textContent = file.name;
+                        uploadedFiles.fam = file;
+                    }
+                });
+                
+                // Tab switching
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', function() {
+                        const tabName = this.getAttribute('data-tab');
+                        switchTab(tabName);
+                    });
+                });
+                
+                // Download links
+                document.getElementById('downloadReport').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showNotification('Report downloaded successfully', 'success');
+                });
+                
+                document.getElementById('downloadSummary').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showNotification('Summary data downloaded successfully', 'success');
+                });
+                
+                document.getElementById('downloadSignificant').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showNotification('Significant regions downloaded successfully', 'success');
+                });
+            }
+            
+            // Initialize the application
+            function init() {
+                // Set up event listeners
+                setupEventListeners();
+                
+                // Start at step 1
+                goToStep(1);
+                
+                // Initialize tabs
+                switchTab('admixture');
+                
+                // Show welcome notification
+                showNotification('Welcome to Local Ancestry Analysis Tool', 'info');
+            }
+            
+            // Initialize the application
+            init();
+        });
+    </script>
+            
+            // File upload elements
+            const bedFile = document.getElementById('bedFile');
+            const bimFile = document.getElementById('bimFile');
+            const famFile = document.getElementById('famFile');
+            const bedFileName = document.getElementById('bedFileName');
+            const bimFileName = document.getElementById('bimFileName');
+            const famFileName = document.getElementById('famFileName');
+            
+            // Button elements
+            const nextToStep2 = document.getElementById('nextToStep2');
+            const backToStep1 = document.getElementById('backToStep1');
+            const nextToStep3 = document.getElementById('nextToStep3');
+            const backToStep2 = document.getElementById('backToStep2');
+            const startAnalysis = document.getElementById('startAnalysis');
+            const stopAnalysis = document.getElementById('stopAnalysis');
+            const newAnalysis = document.getElementById('newAnalysis');
+            
+            // Tab elements
+            const tabs = document.querySelectorAll('.tab');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            
+            // Global variables
+            let currentStep = 1;
+            let analysisRunning = false;
+            let simulatedProgress = 0;
+            let progressInterval;
+            
+            // Mock data for demonstration
+            const mockData = {
+                admixture: {
+                    k2: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAEgCAIAAADV6mCUAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAgAElEQVR4nO3dd1QU1/s/8GdhF1h67yAdEaQJCCqIgKLYS5SYGGOLMXaNJZr4NcYSNTExVhI1arTYNXbFXlARRZqC9N57L7vs7t8fvPObdRdmQRsxn/fhHM/OzL33mcvsPvfO3JkREUIIIYQQUiRFjw6AEEIIIeR+IwlLCCGEEFK4/weF4ATwwS2JyAAAAABJRU5ErkJggg==',
+                    k3: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAEgCAIAAADV6mCUAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAgAElEQVR4nO3dd1QU1/s/8GdhF1h67yAdEaQJCCqIgKLYS5SYGGOLMXaNJZr4NcYSNTExVhI1arTYNXbFXlARRZqC9N57L7vs7t8fvPObdRdmQRsxn/fhHM/OzL33mcvsPvfO3JkREUIIIYQQUiRFjw6AEEIIIeR+IwlLCCGEEFK4/weF4ATwwS2JyAAAAABJRU5ErkJggg=='
+                },
+                pca: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAEgCAIAAADV6mCUAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAgAElEQVR4nO3dd1QU1/s/8GdhF1h67yAdEaQJCCqIgKLYS5SYGGOLMXaNJZr4NcYSNTExVhI1arTYNXbFXlARRZqC9N57L7vs7t8fvPObdRdmQRsxn/fhHM/OzL33mcvsPvfO3JkREUIIIYQQUiRFjw6AEEIIIeR+IwlLCCGEEFK4/weF4ATwwS2JyAAAAABJRU5ErkJggg==',
+                lamp: 'data:image/png;base64,iVBORw0KGgoAAAA
